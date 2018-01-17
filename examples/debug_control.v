@@ -83,9 +83,11 @@ module debug_control(
         if(~cpu_rstn) begin
             cpu_userOp_ready_last <= 0;
             cpu_imem_we <= 0;
+            cpu_dmem_we <= 0;
         end else begin
             cpu_userOp_ready_last <= cpu_userOp_ready;
             cpu_imem_we <= 0;
+            cpu_dmem_we <= 0;
 
             if(execUserOp) case(jtag_userOp)
                 DEBUGOP_STORE_IADDR: cpu_imem_addr <= jtag_userData;
