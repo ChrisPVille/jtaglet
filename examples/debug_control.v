@@ -29,11 +29,11 @@ module debug_control(
     input cpu_clk,
     input cpu_rstn,
 
-    output reg cpu_imem_addr,
-    output reg cpu_imem_data,
+    output reg[31:0] cpu_imem_addr,
+    output reg[31:0] cpu_imem_data,
     output reg cpu_imem_we,
-    output reg cpu_dmem_addr,
-    output reg cpu_dmem_data,
+    output reg[31:0] cpu_dmem_addr,
+    output reg[31:0] cpu_dmem_data,
     output reg cpu_dmem_we
     );
 
