@@ -30,10 +30,15 @@ module debug_control(
     input cpu_rstn,
 
     output reg[31:0] cpu_imem_addr,
-    output reg[31:0] cpu_imem_data,
+    output reg[31:0] cpu_debug_to_imem_data,
+    input[31:0] cpu_imem_to_debug_data,
+    output reg cpu_imem_ce,
     output reg cpu_imem_we,
+
     output reg[31:0] cpu_dmem_addr,
-    output reg[31:0] cpu_dmem_data,
+    output reg[31:0] cpu_debug_to_dmem_data,
+    input[31:0] cpu_dmem_to_debug_data,
+    output reg cpu_dmem_ce,
     output reg cpu_dmem_we
     );
 
@@ -47,10 +52,13 @@ module debug_control(
     wire[7:0] jtag_userOp;
     wire[31:0] jtag_userData;
 
+    reg[31:0] cpu_userData;
+
     //The Jtaglet JTAG TAP
     jtaglet #(.ID_PARTVER(4'h1), .ID_PARTNUM(16'hBEEF), .ID_MANF(11'h035)) jtag_if
         (.tck(jtag_tck), .tms(jtag_tms), .tdo(jtag_tdo), .tdi(jtag_tdi), .trst(jtag_trst),
-         .userData_out(jtag_userData), .userOp(jtag_userOp), .userOp_ready(jtag_userOp_ready));
+         .userData_out(jtag_userData), .userData_in(cpu_userData), .userOp(jtag_userOp),
+         .userOp_ready(jtag_userOp_ready));
 
     //Synchronizer to take the userOp ready signal into the CPU clock domain
     ff_sync #(.WIDTH(1)) userOpReady_toCPUDomain
@@ -80,24 +88,38 @@ module debug_control(
     wire execUserOp = ~cpu_userOp_ready_last & cpu_userOp_ready;
 
     always @(posedge cpu_clk or negedge cpu_rstn) begin
+        cpu_imem_we <= 0;
+        cpu_imem_ce <= 0;
+        cpu_dmem_we <= 0;
+        cpu_dmem_ce <= 0;
         if(~cpu_rstn) begin
             cpu_userOp_ready_last <= 0;
-            cpu_imem_we <= 0;
-            cpu_dmem_we <= 0;
         end else begin
             cpu_userOp_ready_last <= cpu_userOp_ready;
-            cpu_imem_we <= 0;
-            cpu_dmem_we <= 0;
 
             if(execUserOp) case(jtag_userOp)
                 DEBUGOP_STORE_IADDR: cpu_imem_addr <= jtag_userData;
-                DEBUGOP_STORE_IDATA: cpu_imem_data <= jtag_userData;
-                DEBUGOP_WRITEIMEM: cpu_imem_we <= 1;
+                DEBUGOP_STORE_IDATA: cpu_debug_to_imem_data <= jtag_userData;
+                DEBUGOP_READIMEM: cpu_imem_ce <= 1;
+                DEBUGOP_WRITEIMEM: begin
+                    cpu_imem_we <= 1;
+                    cpu_imem_ce <= 1;
+                end
+
                 DEBUGOP_STORE_DADDR: cpu_dmem_addr <= jtag_userData;
-                DEBUGOP_STORE_DDATA: cpu_dmem_data <= jtag_userData;
-                DEBUGOP_WRITEDMEM: cpu_dmem_we <= 1;
+                DEBUGOP_STORE_DDATA: cpu_debug_to_dmem_data <= jtag_userData;
+                DEBUGOP_READDMEM: cpu_dmem_ce <= 1;
+                DEBUGOP_WRITEDMEM: begin
+                    cpu_dmem_we <= 1;
+                    cpu_dmem_ce <= 1;
+                end
             endcase
         end
+    end
+
+    always @(*) begin
+        if(cpu_imem_ce & ~cpu_imem_we) cpu_userData = cpu_imem_to_debug_data;
+        if(cpu_dmem_ce & ~cpu_dmem_we) cpu_userData = cpu_dmem_to_debug_data;
     end
 
 endmodule
