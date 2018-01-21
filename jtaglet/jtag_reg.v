@@ -44,7 +44,7 @@ module jtag_reg #(
 
     always @(posedge tck or negedge trst) begin
         if(~trst) begin
-            dr_reg <= dr_dataIn;
+            dr_reg <= 0;
             dr_dataOut <= 0;
             dr_dataOutReady <= 0;
         end else begin

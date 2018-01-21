@@ -88,26 +88,35 @@ module debug_control(
     wire execUserOp = ~cpu_userOp_ready_last & cpu_userOp_ready;
 
     always @(posedge cpu_clk or negedge cpu_rstn) begin
-        cpu_imem_we <= 0;
-        cpu_imem_ce <= 0;
-        cpu_dmem_we <= 0;
-        cpu_dmem_ce <= 0;
-        if(~cpu_rstn) begin
-            cpu_userOp_ready_last <= 0;
-        end else begin
-            cpu_userOp_ready_last <= cpu_userOp_ready;
+        if(~cpu_rstn) cpu_userOp_ready_last <= 0;
+        else cpu_userOp_ready_last <= cpu_userOp_ready;
+    end
 
+    always @(posedge cpu_clk or negedge cpu_rstn) begin
+        if(~cpu_rstn) begin
+            cpu_imem_we <= 0;
+            cpu_imem_ce <= 0;
+        end else begin
+            cpu_imem_we <= 0;
+            cpu_imem_ce <= 0;
             if(execUserOp) case(jtag_userOp)
-                DEBUGOP_STORE_IADDR: cpu_imem_addr <= jtag_userData;
-                DEBUGOP_STORE_IDATA: cpu_debug_to_imem_data <= jtag_userData;
                 DEBUGOP_READIMEM: cpu_imem_ce <= 1;
                 DEBUGOP_WRITEIMEM: begin
                     cpu_imem_we <= 1;
                     cpu_imem_ce <= 1;
                 end
+            endcase
+        end
+    end
 
-                DEBUGOP_STORE_DADDR: cpu_dmem_addr <= jtag_userData;
-                DEBUGOP_STORE_DDATA: cpu_debug_to_dmem_data <= jtag_userData;
+    always @(posedge cpu_clk or negedge cpu_rstn) begin
+        if(~cpu_rstn) begin
+            cpu_dmem_we <= 0;
+            cpu_dmem_ce <= 0;
+        end else begin
+            cpu_dmem_we <= 0;
+            cpu_dmem_ce <= 0;
+            if(execUserOp) case(jtag_userOp)
                 DEBUGOP_READDMEM: cpu_dmem_ce <= 1;
                 DEBUGOP_WRITEDMEM: begin
                     cpu_dmem_we <= 1;
@@ -117,9 +126,37 @@ module debug_control(
         end
     end
 
-    always @(*) begin
-        if(cpu_imem_ce & ~cpu_imem_we) cpu_userData = cpu_imem_to_debug_data;
-        if(cpu_dmem_ce & ~cpu_dmem_we) cpu_userData = cpu_dmem_to_debug_data;
+    always @(posedge cpu_clk) begin
+        if(execUserOp) case(jtag_userOp)
+            DEBUGOP_STORE_IADDR: cpu_imem_addr <= jtag_userData;
+        endcase
+    end
+
+    always @(posedge cpu_clk) begin
+        if(execUserOp) case(jtag_userOp)
+            DEBUGOP_STORE_IDATA: cpu_debug_to_imem_data <= jtag_userData;
+        endcase
+    end
+
+    always @(posedge cpu_clk) begin
+        if(execUserOp) case(jtag_userOp)
+            DEBUGOP_STORE_DADDR: cpu_dmem_addr <= jtag_userData;
+        endcase
+    end
+
+    always @(posedge cpu_clk) begin
+        if(execUserOp) case(jtag_userOp)
+            DEBUGOP_STORE_DDATA: cpu_debug_to_dmem_data <= jtag_userData;
+        endcase
+    end
+
+    always @(posedge cpu_clk or negedge cpu_rstn) begin
+        if(~cpu_rstn) begin
+            cpu_userData <= 0;
+        end else begin
+            if(cpu_imem_ce & ~cpu_imem_we) cpu_userData <= cpu_imem_to_debug_data;
+            else if(cpu_dmem_ce & ~cpu_dmem_we) cpu_userData <= cpu_dmem_to_debug_data;
+        end
     end
 
 endmodule
