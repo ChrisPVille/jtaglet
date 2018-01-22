@@ -26,8 +26,9 @@ module debug_control(
     input jtag_trst,
     output jtag_tdo,
 
+    input sys_rstn, //System reset. Should NOT be externally tied to our cpu_resetn_cpu output
+
     input cpu_clk,
-    input cpu_rstn,
 
     output reg[31:0] cpu_imem_addr,
     output reg[31:0] cpu_debug_to_imem_data,
@@ -39,7 +40,10 @@ module debug_control(
     output reg[31:0] cpu_debug_to_dmem_data,
     input[31:0] cpu_dmem_to_debug_data,
     output reg cpu_dmem_ce,
-    output reg cpu_dmem_we
+    output reg cpu_dmem_we,
+
+    output reg cpu_halt_cpu,
+    output cpu_resetn_cpu
     );
 
     //Signals from the JTAG TAP to the synchronizer
@@ -62,46 +66,46 @@ module debug_control(
 
     //Synchronizer to take the userOp ready signal into the CPU clock domain
     ff_sync #(.WIDTH(1)) userOpReady_toCPUDomain
-        (.clk(cpu_clk), .rst_p(~cpu_rstn), .in_async(jtag_userOp_ready), .out(cpu_userOp_ready));
+        (.clk(cpu_clk), .rst_p(~sys_rstn), .in_async(jtag_userOp_ready), .out(cpu_userOp_ready));
 
     //Stateless debug operations (which ignore debug register contents)
-    localparam DEBUGOP_NOOP      = 8'h00;
-    localparam DEBUGOP_CPUHALT   = 8'h01;
-    localparam DEBUGOP_CPURESUME = 8'h02;
-    localparam DEBUGOP_CPURESET  = 8'h03;
+    localparam DEBUGOP_NOOP_OP      = 8'h00;
+    localparam DEBUGOP_CPUHALT_OP   = 8'h01;
+    localparam DEBUGOP_CPURESUME_OP = 8'h02;
+    localparam DEBUGOP_CPURESET_OP  = 8'h03;
 
     //Debug operations (use previously stored data to carry out an operation)
-    localparam DEBUGOP_READIMEM  = 8'h04;
-    localparam DEBUGOP_WRITEIMEM = 8'h05;
-    localparam DEBUGOP_READDMEM  = 8'h06;
-    localparam DEBUGOP_WRITEDMEM = 8'h07;
+    localparam DEBUGOP_READIMEM_OP  = 8'h04;
+    localparam DEBUGOP_WRITEIMEM_OP = 8'h05;
+    localparam DEBUGOP_READDMEM_OP  = 8'h06;
+    localparam DEBUGOP_WRITEDMEM_OP = 8'h07;
 
     //Load/store debug operations (have no side-effects apart from
     //loading/storing the appropriate debug register)
-    localparam DEBUGOP_STORE_IADDR     = 8'h80;
-    localparam DEBUGOP_STORE_IDATA     = 8'h81;
-    localparam DEBUGOP_STORE_DADDR     = 8'h82;
-    localparam DEBUGOP_STORE_DDATA     = 8'h83;
-    localparam DEBUGOP_STORE_CPUFLAGS  = 8'h84;
+    localparam DEBUGOP_IADDR_REG     = 8'h80;
+    localparam DEBUGOP_IDATA_REG     = 8'h81;
+    localparam DEBUGOP_DADDR_REG     = 8'h82;
+    localparam DEBUGOP_DDATA_REG     = 8'h83;
+    localparam DEBUGOP_CPUFLAGS_REG  = 8'h84;
 
     reg cpu_userOp_ready_last;
     wire execUserOp = ~cpu_userOp_ready_last & cpu_userOp_ready;
 
-    always @(posedge cpu_clk or negedge cpu_rstn) begin
-        if(~cpu_rstn) cpu_userOp_ready_last <= 0;
+    always @(posedge cpu_clk or negedge sys_rstn) begin
+        if(~sys_rstn) cpu_userOp_ready_last <= 0;
         else cpu_userOp_ready_last <= cpu_userOp_ready;
     end
 
-    always @(posedge cpu_clk or negedge cpu_rstn) begin
-        if(~cpu_rstn) begin
+    always @(posedge cpu_clk or negedge sys_rstn) begin
+        if(~sys_rstn) begin
             cpu_imem_we <= 0;
             cpu_imem_ce <= 0;
         end else begin
             cpu_imem_we <= 0;
             cpu_imem_ce <= 0;
             if(execUserOp) case(jtag_userOp)
-                DEBUGOP_READIMEM: cpu_imem_ce <= 1;
-                DEBUGOP_WRITEIMEM: begin
+                DEBUGOP_READIMEM_OP: cpu_imem_ce <= 1;
+                DEBUGOP_WRITEIMEM_OP: begin
                     cpu_imem_we <= 1;
                     cpu_imem_ce <= 1;
                 end
@@ -109,16 +113,16 @@ module debug_control(
         end
     end
 
-    always @(posedge cpu_clk or negedge cpu_rstn) begin
-        if(~cpu_rstn) begin
+    always @(posedge cpu_clk or negedge sys_rstn) begin
+        if(~sys_rstn) begin
             cpu_dmem_we <= 0;
             cpu_dmem_ce <= 0;
         end else begin
             cpu_dmem_we <= 0;
             cpu_dmem_ce <= 0;
             if(execUserOp) case(jtag_userOp)
-                DEBUGOP_READDMEM: cpu_dmem_ce <= 1;
-                DEBUGOP_WRITEDMEM: begin
+                DEBUGOP_READDMEM_OP: cpu_dmem_ce <= 1;
+                DEBUGOP_WRITEDMEM_OP: begin
                     cpu_dmem_we <= 1;
                     cpu_dmem_ce <= 1;
                 end
@@ -128,34 +132,61 @@ module debug_control(
 
     always @(posedge cpu_clk) begin
         if(execUserOp) case(jtag_userOp)
-            DEBUGOP_STORE_IADDR: cpu_imem_addr <= jtag_userData;
+            DEBUGOP_IADDR_REG: cpu_imem_addr <= jtag_userData;
         endcase
     end
 
     always @(posedge cpu_clk) begin
         if(execUserOp) case(jtag_userOp)
-            DEBUGOP_STORE_IDATA: cpu_debug_to_imem_data <= jtag_userData;
+            DEBUGOP_IDATA_REG: cpu_debug_to_imem_data <= jtag_userData;
         endcase
     end
 
     always @(posedge cpu_clk) begin
         if(execUserOp) case(jtag_userOp)
-            DEBUGOP_STORE_DADDR: cpu_dmem_addr <= jtag_userData;
+            DEBUGOP_DADDR_REG: cpu_dmem_addr <= jtag_userData;
         endcase
     end
 
     always @(posedge cpu_clk) begin
         if(execUserOp) case(jtag_userOp)
-            DEBUGOP_STORE_DDATA: cpu_debug_to_dmem_data <= jtag_userData;
+            DEBUGOP_DDATA_REG: cpu_debug_to_dmem_data <= jtag_userData;
         endcase
     end
 
-    always @(posedge cpu_clk or negedge cpu_rstn) begin
-        if(~cpu_rstn) begin
+    always @(posedge cpu_clk or negedge sys_rstn) begin
+        if(~sys_rstn) begin
             cpu_userData <= 0;
         end else begin
             if(cpu_imem_ce & ~cpu_imem_we) cpu_userData <= cpu_imem_to_debug_data;
             else if(cpu_dmem_ce & ~cpu_dmem_we) cpu_userData <= cpu_dmem_to_debug_data;
+        end
+    end
+
+    //Reset Stretcher
+    reg requestReset;
+    reg[9:0] resetStretch;
+    assign cpu_resetn_cpu = ~(|resetStretch);
+    always @(posedge cpu_clk or negedge sys_rstn) begin
+        if(~sys_rstn) resetStretch <= 10'b0;
+        else if(requestReset) resetStretch <= {10{1'b1}};
+        else if(resetStretch != 0) resetStretch <= resetStretch - 1;
+    end
+
+    always @(posedge cpu_clk or negedge sys_rstn) begin
+        if(~sys_rstn) begin
+            cpu_halt_cpu <= 0;
+            requestReset <= 0;
+        end else begin
+            requestReset <= 0;
+            if(execUserOp) case(jtag_userOp)
+                DEBUGOP_CPUHALT_OP: cpu_halt_cpu <= 1;
+                DEBUGOP_CPURESUME_OP: cpu_halt_cpu <= 0;
+                DEBUGOP_CPURESET_OP: begin
+                    cpu_halt_cpu <= 0;
+                    requestReset <= 1;
+                end
+            endcase
         end
     end
 
