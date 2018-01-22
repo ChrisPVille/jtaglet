@@ -33,12 +33,14 @@ module debug_control(
     output reg[31:0] cpu_imem_addr,
     output reg[31:0] cpu_debug_to_imem_data,
     input[31:0] cpu_imem_to_debug_data,
+    input cpu_imem_to_debug_data_ready,
     output reg cpu_imem_ce,
     output reg cpu_imem_we,
 
     output reg[31:0] cpu_dmem_addr,
     output reg[31:0] cpu_debug_to_dmem_data,
     input[31:0] cpu_dmem_to_debug_data,
+    input cpu_dmem_to_debug_data_ready,
     output reg cpu_dmem_ce,
     output reg cpu_dmem_we,
 
@@ -158,8 +160,8 @@ module debug_control(
         if(~sys_rstn) begin
             cpu_userData <= 0;
         end else begin
-            if(cpu_imem_ce & ~cpu_imem_we) cpu_userData <= cpu_imem_to_debug_data;
-            else if(cpu_dmem_ce & ~cpu_dmem_we) cpu_userData <= cpu_dmem_to_debug_data;
+            if(cpu_imem_to_debug_data_ready) cpu_userData <= cpu_imem_to_debug_data;
+            else if(cpu_dmem_to_debug_data_ready) cpu_userData <= cpu_dmem_to_debug_data;
         end
     end
 
