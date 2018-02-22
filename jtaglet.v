@@ -62,7 +62,7 @@ module jtaglet #(
         (.tck(tck), .trst(trst), .tdi(tdi), .tdo(userData_tdo), .state_tlr(state_tlr),
          .state_capturedr(state_capturedr), .state_shiftdr(state_shiftdr),
          .state_updatedr(state_updatedr), .ir_reg(ir_reg), .dr_dataOut(userData_out),
-         .dr_dataIn(userData_in));
+         .dr_dataIn(userData_in), .dr_dataOutReady());
 
     //USEROPCODE - DR becomes an 8 bit operation select/initiate register passed out of the module
     wire userOp_tdo;
@@ -77,14 +77,16 @@ module jtaglet #(
     jtag_reg #(.IR_LEN(IR_LEN), .DR_LEN(32), .IR_OPCODE(IDCODE_OP)) idcode_reg
         (.tck(tck), .trst(trst), .tdi(tdi), .tdo(idcode_tdo), .state_tlr(state_tlr),
          .state_capturedr(state_capturedr), .state_shiftdr(state_shiftdr),
-         .state_updatedr(1'b0), .ir_reg(ir_reg), .dr_dataIn(idcode));
+         .state_updatedr(1'b0), .ir_reg(ir_reg), .dr_dataOut(),
+         .dr_dataIn(idcode), .dr_dataOutReady());
 
     //BYPASS - DR becomes a 1 bit wide register, suitable for bypassing this part
     wire bypass_tdo;
     jtag_reg #(.IR_LEN(IR_LEN), .DR_LEN(1), .IR_OPCODE(BYPASS_OP)) bypass_reg
          (.tck(tck), .trst(trst), .tdi(tdi), .tdo(bypass_tdo), .state_tlr(state_tlr),
           .state_capturedr(state_capturedr), .state_shiftdr(state_shiftdr),
-          .state_updatedr(1'b0), .ir_reg(ir_reg), .dr_dataIn(0));
+          .state_updatedr(1'b0), .ir_reg(ir_reg), .dr_dataOut(),
+          .dr_dataIn(0), .dr_dataOutReady());
 
     //Instruction Register
     wire ir_tdo;
