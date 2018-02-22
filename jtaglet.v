@@ -105,6 +105,7 @@ module jtaglet #(
     //IR selects the appropriate DR
     reg tdo_pre;
     always @(*) begin
+        tdo_pre = 0;
         if(state_shiftdr) begin
             case(ir_reg)
                 IDCODE_OP:      tdo_pre = idcode_tdo;
