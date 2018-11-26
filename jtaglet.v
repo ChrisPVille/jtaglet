@@ -56,9 +56,9 @@ module jtaglet #(
 
     reg[IR_LEN-1:0] ir_reg;
 
-    //USERDATA - DR becomes a 32 bit user data register passed out of the module
+    //USERDATA - DR becomes a USERDATA_LEN bit user data register passed out of the module
     wire userData_tdo;
-    jtag_reg #(.IR_LEN(IR_LEN), .DR_LEN(32), .IR_OPCODE(USERDATA_OP)) userData_reg
+    jtag_reg #(.IR_LEN(IR_LEN), .DR_LEN(USERDATA_LEN), .IR_OPCODE(USERDATA_OP)) userData_reg
         (.tck(tck), .trst(trst), .tdi(tdi), .tdo(userData_tdo), .state_tlr(state_tlr),
          .state_capturedr(state_capturedr), .state_shiftdr(state_shiftdr),
          .state_updatedr(state_updatedr), .ir_reg(ir_reg), .dr_dataOut(userData_out),
@@ -66,7 +66,7 @@ module jtaglet #(
 
     //USEROPCODE - DR becomes an 8 bit operation select/initiate register passed out of the module
     wire userOp_tdo;
-    jtag_reg #(.IR_LEN(IR_LEN), .DR_LEN(8), .IR_OPCODE(USEROP_OP)) userOp_reg
+    jtag_reg #(.IR_LEN(IR_LEN), .DR_LEN(USEROP_LEN), .IR_OPCODE(USEROP_OP)) userOp_reg
         (.tck(tck), .trst(trst), .tdi(tdi), .tdo(userOp_tdo), .state_tlr(state_tlr),
          .state_capturedr(state_capturedr), .state_shiftdr(state_shiftdr),
          .state_updatedr(state_updatedr), .ir_reg(ir_reg), .dr_dataOut(userOp),
@@ -86,7 +86,7 @@ module jtaglet #(
          (.tck(tck), .trst(trst), .tdi(tdi), .tdo(bypass_tdo), .state_tlr(state_tlr),
           .state_capturedr(state_capturedr), .state_shiftdr(state_shiftdr),
           .state_updatedr(1'b0), .ir_reg(ir_reg), .dr_dataOut(),
-          .dr_dataIn(0), .dr_dataOutReady());
+          .dr_dataIn(1'b0), .dr_dataOutReady());
 
     //Instruction Register
     wire ir_tdo;
